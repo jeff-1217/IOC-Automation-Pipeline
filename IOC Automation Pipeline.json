@@ -1,0 +1,345 @@
+{
+  "name": "IOC Automation Pipeline - AbuseIPDB + VirusTotal + Whois + TheHive + Slack/Email",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b0720039-be9c-4d7d-ba74-c2f78dbd8d2e",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "=https://api.abuseipdb.com/api/v2/blacklist",
+        "options": {}
+      },
+      "id": "2133bab4-4bc6-437f-a53c-cef44a3e5c15",
+      "name": "Fetch AbuseIPDB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        112
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "W43vHURt5jqEFjE0",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const data = item.json.data || [];\n  return data.slice(0, 5).map(i => ({json: {ip: i.ipAddress}}));\n}).flat();"
+      },
+      "id": "409d5f35-b1d8-46b1-8edd-62d9d794bf04",
+      "name": "Extract IPs",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "5cf00cec-057f-4d3e-8bfa-14e2d8c5de34",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "virusTotalApi",
+        "url": "=https://www.virustotal.com/api/v3/ip_addresses/{{$json.ip}}",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "ip",
+              "value": "={{$json.ip}}"
+            }
+          ]
+        }
+      },
+      "id": "8e5045d3-c749-4637-9302-9bbb0737bdd8",
+      "name": "VirusTotal Enrich",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "virusTotalApi": {
+          "id": "BgOpDjWe04a4z8ir",
+          "name": "VirusTotal account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return [\n  {\n    json: {\n      ip: $json.ip,\n      vt: $node[\"VirusTotal Enrich\"].json,\n      otx: $node[\"Alienvault otx\"].json\n    }\n  }\n];"
+      },
+      "id": "b7aaec9b-1ef9-48e4-bd19-e36443fa0293",
+      "name": "Merge Enrichment",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        208,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://hooks.slack.com/services/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",
+        "responseFormat": "string",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "text",
+              "value": "=IOC Alert: Suspicious IP Detected\\nIP: {{$json.vt.data.id}}\\nDetails: [VirusTotal]({{$json.vt.data.links.self}})"
+            }
+          ]
+        }
+      },
+      "id": "eecc4e2e-c16c-4612-bc2c-82b4ab39c2e2",
+      "name": "Slack Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "jefrinecorreya1234@gmail.com",
+        "subject": "=IOC Alert: {{$json.vt.data.id}}",
+        "message": "=<h2 style=\"color:#d32f2f;\">IOC Alert: Suspicious IP Detected</h2>\n<table style=\"border-collapse:collapse;\">\n  <tr>\n    <td style=\"font-weight:bold;\">IP Address:</td>\n    <td>{{$json.vt.data.id}}</td>\n  </tr>\n  <tr>\n    <td style=\"font-weight:bold;\">VirusTotal Link:</td>\n    <td><a href=\"{{$json.vt.data.links.self}}\" target=\"_blank\">{{$json.vt.data.id}}</a></td>\n  </tr>\n  <tr>\n    <td style=\"font-weight:bold;\">Alienvault Whois:</td>\n    <td>{{$json.otx.whois}}</td>\n  </tr>\n</table>\n<br>\n<p style=\"color:#757575;\">This is an automated alert from security monitoring.</p>",
+        "options": {
+          "senderName": "jefrin"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        64
+      ],
+      "id": "df367382-4784-462d-bad5-bba85037e753",
+      "name": "Send a message",
+      "webhookId": "616a1434-012d-4b82-8ea2-6f3fc36cb0ce",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "64xpBg7SbAJgZ3FX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "=https://otx.alienvault.com/api/v1/indicators/IPv4/{{$json[\"ip\"]}}/general",
+        "options": {}
+      },
+      "id": "16a4ed7c-b2db-40d4-bea9-e55eb6d7b112",
+      "name": "Alienvault otx",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        0,
+        208
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9VcXNPuRa5vsGnrt",
+          "name": "Header Auth account 3"
+        },
+        "httpQueryAuth": {
+          "id": "cwt4ZlLdKZLJB7WF",
+          "name": "Query Auth account"
+        },
+        "httpBasicAuth": {
+          "id": "ej77DHK2h88Sd7ad",
+          "name": "WhoisJSON"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cloud.wazuh.com/api/v1/alerts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        624,
+        288
+      ],
+      "id": "ea03a0d4-384d-4d45-9471-d28943f66eee",
+      "name": "Wazuh Cloud",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DL4NbPWNyslUTXSC",
+          "name": "Header Auth account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=echo '{\"event_type\":\"ioc_alert\",\"ip\":\"{{$json.vt.data.id}}\",\"reputation\":{{$json.vt.data.attributes.reputation}},\"otx_pulses\":{{$json.otx.pulse_info.count}}}'\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        416,
+        224
+      ],
+      "id": "78ce85ca-67a3-47bd-a298-6c05307e9dc8",
+      "name": "Execute Command"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch AbuseIPDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch AbuseIPDB": {
+      "main": [
+        [
+          {
+            "node": "Extract IPs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract IPs": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "VirusTotal Enrich",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Alienvault otx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VirusTotal Enrich": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alienvault otx": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wazuh Cloud": {
+      "main": [
+        []
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "Wazuh Cloud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6abd6643-099f-42ee-8a36-41c1cf9b696d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "eb1fc36ff7afba5a499d8bcc81cefa0fc61fac9e94d7d7fd8da226d14b3890d7"
+  },
+  "id": "kZrOhfkR9bh7vm1q",
+  "tags": []
+}
