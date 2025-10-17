@@ -14,7 +14,7 @@ Automates the detection, enrichment, and notification process for suspicious IP 
 ### 🧩 Tech Stack
 - **n8n** (workflow orchestration)
 - **AbuseIPDB**, **VirusTotal**, **AlienVault OTX**, **Whois APIs**
-- **TheHive**, **Wazuh Cloud**
+- **Wazuh Cloud**
 - **Slack Webhooks**, **Gmail Integration**
 
 ### 🚀 Key Advantages
